@@ -1,15 +1,19 @@
 package refs
 
 import (
+	"context"
 	"fmt"
 	"html/template"
 	"log"
 	"net/http"
 
 	"github.com/jcgregorio/webmention-func/admin"
+	"github.com/jcgregorio/webmention-func/config"
+	"github.com/jcgregorio/webmention-func/mention"
 )
 
 var (
+	m           *mention.Mentions
 	refTemplate *template.Template
 	refSource   = fmt.Sprintf(`<!DOCTYPE html>
 <html>
@@ -35,11 +39,16 @@ var (
 	<h1>Content goes here.</h1>
 </body>
 </html>
-`, admin.CLIENT_ID)
+`, config.CLIENT_ID)
 )
 
 func init() {
 	refTemplate = template.Must(template.New("ref").Parse(refSource))
+	var err error
+	m, err = mention.NewMentions(context.Background(), config.PROJECT, config.DATASTORE_NAMESPACE)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 type refPageContext struct {

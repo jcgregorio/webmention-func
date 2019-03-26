@@ -6,18 +6,8 @@ import (
 	"log"
 	"net/http"
 	"time"
-)
 
-const (
-	CLIENT_ID = "952643138919-jh0117ivtbqkc9njoh91csm7s465c4na.apps.googleusercontent.com"
-)
-
-var (
-	ADMINS = []string{"joe.gregorio@gmail.com"}
-
-	client = &http.Client{
-		Timeout: time.Second * 10,
-	}
+	"github.com/jcgregorio/webmention-func/config"
 )
 
 type Claims struct {
@@ -26,6 +16,12 @@ type Claims struct {
 	Name    string `json:"name"`
 	Picture string `json:"picture"`
 }
+
+var (
+	client = &http.Client{
+		Timeout: time.Second * 30,
+	}
+)
 
 func IsAdmin(r *http.Request) bool {
 	idtoken, err := r.Cookie("id_token")
@@ -44,11 +40,11 @@ func IsAdmin(r *http.Request) bool {
 		return false
 	}
 	// Check if aud is correct.
-	if claims.Aud != CLIENT_ID {
+	if claims.Aud != config.CLIENT_ID {
 		return false
 	}
 
-	for _, email := range ADMINS {
+	for _, email := range config.ADMINS {
 		if email == claims.Mail {
 			return true
 		}
