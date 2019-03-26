@@ -3,7 +3,11 @@ package mention
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
+	"math/rand"
+	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"testing"
@@ -13,7 +17,6 @@ import (
 	_ "image/jpeg"
 
 	"github.com/stretchr/testify/assert"
-	"go.skia.org/infra/go/ds/testutil"
 	"willnorris.com/go/microformats"
 )
 
@@ -67,11 +70,59 @@ func TestParseAtomFeed(t *testing.T) {
 	*/
 }
 
-func TestDB(t *testing.T) {
-	cleanup := testutil.InitDatastore(t, MENTIONS)
-	defer cleanup()
+// InitDatastore is a common utility function used in tests. It sets up the
+// datastore to connect to the emulator and also clears out all instances of
+// the given 'kinds' from the datastore.
+func InitForTesting(t assert.TestingT) *Mentions {
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	emulatorHost := os.Getenv("DATASTORE_EMULATOR_HOST")
+	if emulatorHost == "" {
+		assert.Fail(t, `Running tests that require a running Cloud Datastore emulator.
 
-	err := Put(context.Background(), &Mention{
+Run
+
+	"gcloud beta emulators datastore start --no-store-on-disk --host-port=localhost:8888"
+
+and then run
+
+  $(gcloud beta emulators datastore env-init)
+
+to set the environment variables. When done running tests you can unset the env variables:
+
+  $(gcloud beta emulators datastore env-unset)
+
+`)
+	}
+
+	// Copied from net/http to create a fresh http client. In some tests the
+	// httpmock replaces the default http client and the healthcheck below fails.
+	var transport http.RoundTripper = &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+	httpClient := &http.Client{Transport: transport}
+
+	// Do a quick healthcheck against the host, which will fail immediately if it's down.
+	_, err := httpClient.Get("http://" + emulatorHost + "/")
+	assert.NoError(t, err, fmt.Sprintf("Cloud emulator host %s appears to be down or not accessible.", emulatorHost))
+
+	m, err := NewMentions(context.Background(), "test-project", fmt.Sprintf("test-namespace-%d", r.Uint64()))
+	assert.NoError(t, err)
+	return m
+}
+
+func TestDB(t *testing.T) {
+	m := InitForTesting(t)
+
+	err := m.Put(context.Background(), &Mention{
 		Source: "https://stackoverflow.com/foo",
 		Target: "https://bitworking.org/bar",
 		State:  GOOD_STATE,
@@ -79,7 +130,7 @@ func TestDB(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	err = Put(context.Background(), &Mention{
+	err = m.Put(context.Background(), &Mention{
 		Source: "https://spam.com/foo",
 		Target: "https://bitworking.org/bar",
 		State:  SPAM_STATE,
@@ -87,7 +138,7 @@ func TestDB(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	err = Put(context.Background(), &Mention{
+	err = m.Put(context.Background(), &Mention{
 		Source: "https://news.ycombinator.com/foo",
 		Target: "https://bitworking.org/bar",
 		State:  GOOD_STATE,
@@ -96,8 +147,8 @@ func TestDB(t *testing.T) {
 	assert.NoError(t, err)
 	time.Sleep(2)
 
-	m := GetGood(context.Background(), "https://bitworking.org/bar")
-	assert.Len(t, m, 2)
+	mentions := m.GetGood(context.Background(), "https://bitworking.org/bar")
+	assert.Len(t, mentions, 2)
 }
 
 func TestParseMicroformats(t *testing.T) {
@@ -107,14 +158,15 @@ func TestParseMicroformats(t *testing.T) {
 	<h1 class="post-title p-name" itemprop="name headline">WebMention Only</h1>
 	<p class="post-meta">
 	<a class="u-url" href="/news/2018/01/webmention-only">
-	<time datetime="2018-01-13T00:00:00-05:00" itemprop="datePublished" class="dt-published">
-
-	Jan 13, 2018
-	</time>
+    	<time datetime="2018-01-13T00:00:00-05:00" itemprop="datePublished" class="dt-published"> Jan 13, 2018 </time>
 	</a>
-	• <a rel="author" class="p-author h-card" href="/about"> <span itemprop="author" itemscope="" itemtype="http://schema.org/Person">
-	<img class="u-photo" src="/images/joe2016.jpg" alt="" style="height: 16px; border-radius: 8px; margin-right: 4px;">
-	<span itemprop="name">Joe Gregorio</span></span></a>
+	•
+	<a rel="author" class="p-author h-card" href="/about">
+	    <span itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+	        <img class="u-photo" src="/images/joe2016.jpg" alt="" style="height: 16px; border-radius: 8px; margin-right: 4px;">
+	        <span itemprop="name">Joe Gregorio</span>
+			</span>
+	  </a>
 	</p>
 	</header>
 
@@ -128,22 +180,21 @@ func TestParseMicroformats(t *testing.T) {
 	<div id="mentions"></div>
 </article>`
 
-	cleanup := testutil.InitDatastore(t, THUMBNAIL)
-	defer cleanup()
+	m := InitForTesting(t)
 
 	reader := bytes.NewReader([]byte(raw))
 	u, err := url.Parse("https://bitworking.org/news/2018/01/webmention-only")
 	assert.NoError(t, err)
 	data := microformats.Parse(reader, u)
-	m := &Mention{
+	mention := &Mention{
 		Source: "https://bitworking.org/news/2018/01/webmention-only",
 	}
 	urlToImageReader := func(url string) (io.ReadCloser, error) {
 		return os.Open("./testdata/author_image.jpg")
 	}
-	findHEntry(context.Background(), urlToImageReader, m, data.Items)
-	assert.Equal(t, "Joe Gregorio", m.Author)
-	assert.Equal(t, "https://bitworking.org/about", m.AuthorURL)
-	assert.Equal(t, "2018-01-13 00:00:00 -0500 EST", m.Published.String())
-	assert.Equal(t, "f3f799d1a61805b5ee2ccb5cf0aebafa", m.Thumbnail)
+	m.findHEntry(context.Background(), urlToImageReader, mention, data, data.Items)
+	assert.Equal(t, "Joe Gregorio", mention.Author)
+	assert.Equal(t, "2018-01-13 00:00:00 -0500 EST", mention.Published.String())
+	assert.Equal(t, "f3f799d1a61805b5ee2ccb5cf0aebafa", mention.Thumbnail)
+	assert.Equal(t, "https://bitworking.org/about", mention.AuthorURL)
 }

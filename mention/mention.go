@@ -13,7 +13,6 @@ import (
 	_ "image/png"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -28,7 +27,6 @@ import (
 	"github.com/jcgregorio/webmention-func/atom"
 	"github.com/jcgregorio/webmention-func/ds"
 	"github.com/nfnt/resize"
-	"github.com/skia-dev/glog"
 )
 
 const (
@@ -39,7 +37,7 @@ const (
 
 func close(c io.Closer) {
 	if err := c.Close(); err != nil {
-		log.Printf("Failed to close: %s", err)
+		fmt.Printf("Failed to close: %s", err)
 	}
 }
 
@@ -67,10 +65,10 @@ func (m *Mentions) sent(source string) (time.Time, bool) {
 
 	dst := &WebMentionSent{}
 	if err := m.DS.Client.Get(context.Background(), key, dst); err != nil {
-		glog.Warningf("Failed to find source: %q", source)
+		fmt.Printf("Failed to find source: %q", source)
 		return time.Time{}, false
 	} else {
-		glog.Warningf("Found source: %q", source)
+		fmt.Printf("Found source: %q", source)
 		return dst.TS, true
 	}
 }
@@ -87,7 +85,7 @@ func (m *Mentions) recordSent(source string, updated time.Time) error {
 }
 
 func (m *Mentions) ProcessAtomFeed(c *http.Client, filename string) error {
-	glog.Info("Processing Atom Feed")
+	fmt.Printf("Processing Atom Feed")
 	f, err := os.Open(filename)
 	if err != nil {
 		return err
@@ -100,31 +98,31 @@ func (m *Mentions) ProcessAtomFeed(c *http.Client, filename string) error {
 	wmc := webmention.New(c)
 	for source, ms := range mentionSources {
 		ts, ok := m.sent(source)
-		glog.Warningf("Updated: %v  ts: %v ok: %v after: %v", ms.Updated.Unix(), ts.Unix(), ok, ms.Updated.After(ts.Add(time.Second)))
+		fmt.Printf("Updated: %v  ts: %v ok: %v after: %v", ms.Updated.Unix(), ts.Unix(), ok, ms.Updated.After(ts.Add(time.Second)))
 		if ok && ts.Before(ms.Updated.Add(time.Second)) {
-			glog.Infof("Skipping since already sent: %s", source)
+			fmt.Printf("Skipping since already sent: %s", source)
 			continue
 		}
-		glog.Infof("Processing Source: %s", source)
+		fmt.Printf("Processing Source: %s", source)
 		for _, target := range ms.Targets {
-			glog.Infof("  to Target: %s", target)
+			fmt.Printf("  to Target: %s", target)
 			endpoint, err := wmc.DiscoverEndpoint(target)
 			if err != nil {
-				glog.Errorf("Failed looking for endpoint: %s", err)
+				fmt.Printf("Failed looking for endpoint: %s", err)
 				continue
 			} else if endpoint == "" {
-				glog.Infof("No webmention support at: %s", target)
+				fmt.Printf("No webmention support at: %s", target)
 				continue
 			}
 			_, err = wmc.SendWebmention(endpoint, source, target)
 			if err != nil {
-				glog.Errorf("Error sending webmention to %s: %s", target, err)
+				fmt.Printf("Error sending webmention to %s: %s", target, err)
 			} else {
-				glog.Infof("Sent webmention from %s to %s", source, target)
+				fmt.Printf("Sent webmention from %s to %s", source, target)
 			}
 		}
 		if err := m.recordSent(source, ms.Updated); err != nil {
-			glog.Errorf("Failed recording Sent state: %s", err)
+			fmt.Printf("Failed recording Sent state: %s", err)
 		}
 	}
 	return nil
@@ -149,7 +147,7 @@ func ParseAtomFeed(r io.Reader) (map[string]*MentionSource, error) {
 		buf := bytes.NewBufferString(entry.Content)
 		links, err := webmention.DiscoverLinksFromReader(buf, entry.Link.HREF, "")
 		if err != nil {
-			glog.Errorf("Failed while discovering links in %q: %s", entry.Link.HREF, err)
+			fmt.Printf("Failed while discovering links in %q: %s", entry.Link.HREF, err)
 			continue
 		}
 		updated, err := time.Parse(time.RFC3339, entry.Updated)
@@ -221,7 +219,7 @@ func (m *Mention) FastValidate() error {
 }
 
 func (m *Mentions) SlowValidate(mention *Mention, c *http.Client) error {
-	glog.Infof("SlowValidate: %q", mention.Source)
+	fmt.Printf("SlowValidate: %q", mention.Source)
 	resp, err := c.Get(mention.Source)
 	if err != nil {
 		return fmt.Errorf("Failed to retrieve source: %s", err)
@@ -257,25 +255,27 @@ func (m *Mentions) ParseMicroformats(mention *Mention, r io.Reader, urlToImageRe
 	data := microformats.Parse(r, u)
 	b, err := json.MarshalIndent(data, "", "  ")
 	if err == nil {
-		glog.Infof("JSON: %q\n", string(b))
+		fmt.Printf("JSON: %q\n", string(b))
+	} else {
+		fmt.Printf("Errors parsing microformats: %s", err)
 	}
-	m.findHEntry(context.Background(), urlToImageReader, mention, data.Items)
+	m.findHEntry(context.Background(), urlToImageReader, mention, data, data.Items)
 	// Find an h-entry with the m.Target.
 }
 
 func (m *Mentions) VerifyQueuedMentions(c *http.Client) {
 	queued := m.GetQueued(context.Background())
-	glog.Infof("About to slow verify %d queud mentions.", len(queued))
+	fmt.Printf("About to slow verify %d queud mentions.", len(queued))
 	for _, mention := range queued {
-		glog.Infof("Verifying queued webmention from %q", mention.Source)
+		fmt.Printf("Verifying queued webmention from %q", mention.Source)
 		if m.SlowValidate(mention, c) == nil {
 			mention.State = GOOD_STATE
 		} else {
 			mention.State = SPAM_STATE
-			glog.Warningf("Failed to validate webmention: %#v", *mention)
+			fmt.Printf("Failed to validate webmention: %#v", *mention)
 		}
 		if err := m.Put(context.Background(), mention); err != nil {
-			glog.Errorf("Failed to save validated message: %s", err)
+			fmt.Printf("Failed to save validated message: %s", err)
 		}
 	}
 }
@@ -296,7 +296,7 @@ func (m *Mentions) get(ctx context.Context, target string, all bool) []*Mention 
 			break
 		}
 		if err != nil {
-			glog.Errorf("Failed while reading: %s", err)
+			fmt.Printf("Failed while reading: %s", err)
 			break
 		}
 		ret = append(ret, m)
@@ -354,7 +354,7 @@ func (m *Mentions) GetTriage(ctx context.Context, limit, offset int) []*MentionW
 			break
 		}
 		if err != nil {
-			glog.Errorf("Failed while reading: %s", err)
+			fmt.Printf("Failed while reading: %s", err)
 			break
 		}
 		ret = append(ret, &MentionWithKey{
@@ -378,7 +378,7 @@ func (m *Mentions) GetQueued(ctx context.Context) []*Mention {
 			break
 		}
 		if err != nil {
-			glog.Errorf("Failed while reading: %s", err)
+			fmt.Printf("Failed while reading: %s", err)
 			break
 		}
 		ret = append(ret, m)
@@ -408,6 +408,7 @@ func in(s string, arr []string) bool {
 }
 
 func firstPropAsString(uf *microformats.Microformat, key string) string {
+	fmt.Printf("firstPropAsString: %s %s", uf.Properties, key)
 	for _, sint := range uf.Properties[key] {
 		if s, ok := sint.(string); ok {
 			return s
@@ -416,7 +417,7 @@ func firstPropAsString(uf *microformats.Microformat, key string) string {
 	return ""
 }
 
-func (m *Mentions) findHEntry(ctx context.Context, u2r UrlToImageReader, mention *Mention, items []*microformats.Microformat) {
+func (m *Mentions) findHEntry(ctx context.Context, u2r UrlToImageReader, mention *Mention, data *microformats.Data, items []*microformats.Microformat) {
 	for _, it := range items {
 		if in("h-entry", it.Type) {
 			mention.Title = firstPropAsString(it, "name")
@@ -435,12 +436,12 @@ func (m *Mentions) findHEntry(ctx context.Context, u2r UrlToImageReader, mention
 			if authorsInt, ok := it.Properties["author"]; ok {
 				for _, authorInt := range authorsInt {
 					if author, ok := authorInt.(*microformats.Microformat); ok {
-						m.findAuthor(ctx, u2r, mention, author)
+						m.findAuthor(ctx, u2r, mention, data, author)
 					}
 				}
 			}
 		}
-		m.findHEntry(ctx, u2r, mention, it.Children)
+		m.findHEntry(ctx, u2r, mention, data, it.Children)
 	}
 }
 
@@ -461,26 +462,26 @@ func MakeUrlToImageReader(c *http.Client) UrlToImageReader {
 	}
 }
 
-func (m *Mentions) findAuthor(ctx context.Context, u2r UrlToImageReader, mention *Mention, it *microformats.Microformat) {
-	glog.Info("Found author in microformat.")
+func (m *Mentions) findAuthor(ctx context.Context, u2r UrlToImageReader, mention *Mention, data *microformats.Data, it *microformats.Microformat) {
+	fmt.Printf("Found author in microformat.")
 	mention.Author = it.Value
-	mention.AuthorURL = firstPropAsString(it, "url")
+	mention.AuthorURL = data.Rels["author"][0]
 	u := firstPropAsString(it, "photo")
 	if u == "" {
-		glog.Warning("No photo URL found.")
+		fmt.Printf("No photo URL found.")
 		return
 	}
 
 	r, err := u2r(u)
 	if err != nil {
-		glog.Warning("Failed to retrieve photo.")
+		fmt.Printf("Failed to retrieve photo.")
 		return
 	}
 
 	defer close(r)
 	img, _, err := image.Decode(r)
 	if err != nil {
-		glog.Warning("Failed to decode photo.")
+		fmt.Printf("Failed to decode photo.")
 		return
 	}
 	rect := img.Bounds()
@@ -498,7 +499,7 @@ func (m *Mentions) findAuthor(ctx context.Context, u2r UrlToImageReader, mention
 		CompressionLevel: png.BestCompression,
 	}
 	if err := encoder.Encode(&buf, resized); err != nil {
-		glog.Warning("Failed to encode photo.")
+		fmt.Printf("Failed to encode photo.")
 		return
 	}
 
@@ -509,7 +510,7 @@ func (m *Mentions) findAuthor(ctx context.Context, u2r UrlToImageReader, mention
 	key := m.DS.NewKey(THUMBNAIL)
 	key.Name = hash
 	if _, err := m.DS.Client.Put(ctx, key, t); err != nil {
-		glog.Errorf("Failed to write: %s", err)
+		fmt.Printf("Failed to write: %s", err)
 		return
 	}
 	mention.Thumbnail = hash
