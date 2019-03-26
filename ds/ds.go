@@ -23,12 +23,12 @@ type DS struct {
 // project - The project name, i.e. "google.com:skia-buildbots".
 // ns      - The datastore namespace to store data into.
 // opt     - Options to pass to the client.
-func New(project string, ns string) (*DS, error) {
+func New(ctx context.Context, project string, ns string) (*DS, error) {
 	if ns == "" {
 		return nil, fmt.Errorf("Datastore namespace cannot be empty.")
 	}
 
-	client, err := datastore.NewClient(context.Background(), project)
+	client, err := datastore.NewClient(ctx, project)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to initialize Cloud Datastore: %s", err)
 	}
