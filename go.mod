@@ -4,6 +4,7 @@ go 1.12
 
 require (
 	cloud.google.com/go v0.37.2
+	github.com/docker/go-units v0.3.3
 	github.com/jcgregorio/userve v0.0.0-20180121062055-081eeee85f71
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/skia-dev/glog v0.0.0-20150824125442-a87d34e29968
