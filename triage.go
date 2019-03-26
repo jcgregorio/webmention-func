@@ -76,7 +76,7 @@ var (
 		</div>
   {{end}}
   </div>
-	<div><a href="/u/triage?offset={{.Offset}}">Next</a></div>
+	<div><a href="?offset={{.Offset}}">Next</a></div>
 	<script type="text/javascript" charset="utf-8">
 	 // TODO - listen on div.webmentions for click/input and then write
 	 // triage action back to server.
