@@ -2,6 +2,7 @@ package refs
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"log"
@@ -83,7 +84,8 @@ var (
 	 document.getElementById('webmentions').addEventListener('change', e => {
 		 console.log(e);
 		 if (e.target.dataset.key != "") {
-			 fetch("/u/updateMention", {
+			 fetch("/UpdateMention", {
+			   credentials: 'same-origin',
 				 method: 'POST',
 				 body: JSON.stringify({
 					 key: e.target.dataset.key,
@@ -114,8 +116,8 @@ type triageContext struct {
 	Offset   int64
 }
 
-// TriageHandler displays the triage page for Webmentions.
-func TriageHandler(w http.ResponseWriter, r *http.Request) {
+// Triage displays the triage page for Webmentions.
+func Triage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
 	context := &triageContext{}
 	isAdmin := admin.IsAdmin(r)
@@ -146,5 +148,26 @@ func TriageHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := triageTemplate.Execute(w, context); err != nil {
 		log.Printf("Failed to render triage template: %s", err)
+	}
+}
+
+type updateMention struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+func UpdateMention(w http.ResponseWriter, r *http.Request) {
+	isAdmin := admin.IsAdmin(r)
+	if !isAdmin {
+		http.Error(w, "Unauthorized", 401)
+	}
+	var u updateMention
+	if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
+		log.Printf("Failed to decode update: %s", err)
+		http.Error(w, "Bad JSON", 400)
+	}
+	if err := m.UpdateState(r.Context(), u.Key, u.Value); err != nil {
+		log.Printf("Failed to write update: %s", err)
+		http.Error(w, "Failed to write", 400)
 	}
 }
