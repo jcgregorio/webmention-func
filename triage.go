@@ -100,6 +100,55 @@ var (
 	</script>
 </body>
 </html>`, config.CLIENT_ID)))
+
+	mentionsTemplate = template.Must(template.New("mentions").Funcs(template.FuncMap{
+		"humanTime": func(t time.Time) string {
+			if t.IsZero() {
+				return ""
+			}
+			return " • " + units.HumanDuration(time.Now().Sub(t)) + " ago"
+		},
+		"rfc3999": func(t time.Time) string {
+			if t.IsZero() {
+				return ""
+			}
+			return t.Format(time.RFC3339)
+		},
+		"trunc": func(s string) string {
+			if len(s) > 200 {
+				return s[:200] + "..."
+			}
+			return s
+		},
+	}).Parse(`
+	<section id=webmention>
+	<h3>WebMentions</h3>
+	{{ range . }}
+	    <span class="wm-author">
+				{{ if .AuthorURL }}
+					{{ if .Thumbnail }}
+					<a href="{{ .AuthorURL}}" rel=nofollow class="wm-thumbnail">
+						<img src="/u/thumbnail/{{ .Thumbnail }}"/>
+					</a>
+					{{ end }}
+					<a href="{{ .AuthorURL}}" rel=nofollow>
+						{{ .Author }}
+					</a>
+				{{ else }}
+					{{ .Author }}
+				{{ end }}
+			</span>
+			<time datetime="{{ .Published | rfc3999 }}">{{ .Published | humanTime }}</time>
+			<a class="wm-content" href="{{ .Source }}" rel=nofollow>
+				{{ if .Title }}
+					{{ .Title | trunc }}
+				{{ else }}
+					{{ .Source | trunc }}
+				{{ end }}
+			</a>
+	{{ end }}
+	</section>
+`))
 )
 
 func init() {
@@ -169,5 +218,17 @@ func UpdateMention(w http.ResponseWriter, r *http.Request) {
 	if err := m.UpdateState(r.Context(), u.Key, u.Value); err != nil {
 		log.Printf("Failed to write update: %s", err)
 		http.Error(w, "Failed to write", 400)
+	}
+}
+
+// Mentions returns HTML describing all the good Webmentions for the given URL.
+func Mentions(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html")
+	m := m.GetGood(r.Context(), r.Referer())
+	if len(m) == 0 {
+		return
+	}
+	if err := mentionsTemplate.Execute(w, m); err != nil {
+		log.Printf("Failed to expand template: %s", err)
 	}
 }
