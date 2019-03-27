@@ -124,12 +124,13 @@ var (
 	}).Parse(`
 	<section id=webmention>
 	<h3>WebMentions</h3>
-	{{ range . }}
-	    <span class="wm-author">
+	{{ $host := .Host }}
+	{{ range .Mentions }}
+			<span class="wm-author">
 				{{ if .AuthorURL }}
 					{{ if .Thumbnail }}
 					<a href="{{ .AuthorURL}}" rel=nofollow class="wm-thumbnail">
-						<img src="/Thumbnail/{{ .Thumbnail }}"/>
+						<img src="{{ $host }}/Thumbnail/{{ .Thumbnail }}"/>
 					</a>
 					{{ end }}
 					<a href="{{ .AuthorURL}}" rel=nofollow>
@@ -224,14 +225,23 @@ func UpdateMention(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+type MentionsContext struct {
+	Host     string
+	Mentions []*mention.Mention
+}
+
 // Mentions returns HTML describing all the good Webmentions for the given URL.
 func Mentions(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
-	m := m.GetGood(r.Context(), r.Referer())
-	if len(m) == 0 {
+	mentions := m.GetGood(r.Context(), r.Referer())
+	if len(mentions) == 0 {
 		return
 	}
-	if err := mentionsTemplate.Execute(w, m); err != nil {
+	context := MentionsContext{
+		Host:     config.HOST,
+		Mentions: mentions,
+	}
+	if err := mentionsTemplate.Execute(w, context); err != nil {
 		log.Printf("Failed to expand template: %s", err)
 	}
 }
