@@ -173,7 +173,7 @@ type triageContext struct {
 func Triage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
 	context := &triageContext{}
-	isAdmin := admin.IsAdmin(r)
+	isAdmin := admin.IsAdmin(r, log)
 	if isAdmin {
 		limitText := r.FormValue("limit")
 		if limitText == "" {
@@ -212,7 +212,7 @@ type updateMention struct {
 // UpdateMention updates the triage state of a webmention.
 // Called from the Triage page.
 func UpdateMention(w http.ResponseWriter, r *http.Request) {
-	isAdmin := admin.IsAdmin(r)
+	isAdmin := admin.IsAdmin(r, log)
 	if !isAdmin {
 		http.Error(w, "Unauthorized", 401)
 	}

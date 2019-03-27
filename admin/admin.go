@@ -3,10 +3,10 @@ package admin
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
+	"github.com/jcgregorio/slog"
 	"github.com/jcgregorio/webmention-func/config"
 )
 
@@ -23,24 +23,25 @@ var (
 	}
 )
 
-func IsAdmin(r *http.Request) bool {
+func IsAdmin(r *http.Request, log slog.Logger) bool {
 	idtoken, err := r.Cookie("id_token")
 	if err != nil {
-		fmt.Println("Cookie not set.")
+		log.Infof("No cookie supplied.")
 		return false
 	}
 	resp, err := client.Get(fmt.Sprintf("https://www.googleapis.com/oauth2/v3/tokeninfo?%s", idtoken))
 	if err != nil || resp.StatusCode != 200 {
-		log.Printf("Failed to validate idtoken: %#v %s", *resp, err)
+		log.Infof("Failed to validate idtoken: %#v %s", *resp, err)
 		return false
 	}
 	claims := Claims{}
 	if err := json.NewDecoder(resp.Body).Decode(&claims); err != nil {
-		log.Printf("Failed to decode claims: %s", err)
+		log.Infof("Failed to decode claims: %s", err)
 		return false
 	}
 	// Check if aud is correct.
 	if claims.Aud != config.CLIENT_ID {
+		log.Infof("Wrong audience.")
 		return false
 	}
 
@@ -49,6 +50,6 @@ func IsAdmin(r *http.Request) bool {
 			return true
 		}
 	}
-	log.Printf("%q is not an administrator.", claims.Mail)
+	log.Infof("%q is not an administrator.", claims.Mail)
 	return false
 }
