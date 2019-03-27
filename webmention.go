@@ -254,3 +254,18 @@ func IncomingWebMention(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusAccepted)
 }
+
+type PubSubMessage struct {
+	Data []byte `json:"data"`
+}
+
+// VerifyQueuedMentions verifies untriaged webmentions.
+//
+// Should be called on a timer.
+func VerifyQueuedMentions(ctx context.Context, ps PubSubMessage) error {
+	client := &http.Client{
+		Timeout: time.Second * 30,
+	}
+	m.VerifyQueuedMentions(client)
+	return nil
+}
