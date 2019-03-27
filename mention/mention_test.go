@@ -16,6 +16,7 @@ import (
 	_ "image/gif"
 	_ "image/jpeg"
 
+	"github.com/jcgregorio/logger"
 	"github.com/stretchr/testify/assert"
 	"willnorris.com/go/microformats"
 )
@@ -54,21 +55,6 @@ const (
    </entry>
 </feed>`
 )
-
-func TestParseAtomFeed(t *testing.T) {
-	buf := bytes.NewBufferString(feed1)
-	mentionSources, err := ParseAtomFeed(buf)
-	assert.NoError(t, err)
-	assert.NotNil(t, mentionSources)
-	assert.Equal(t, 3, len(mentionSources))
-	/*
-		assert.Equal(t, "http://example.com", mentionSources[0].Targets[0])
-		assert.Equal(t, "http://bitworking.org/news/2016/08/interial_balance", mentionSources[0].Source)
-		assert.Equal(t, 0, len(mentionSources[1].Targets))
-		assert.Equal(t, "http://bitworking.org/news/2016/08/sample.js", mentionSources[2].Targets[0])
-		assert.Equal(t, "http://bitworking.org/news/2016/08/sample.js", mentionSources[2].Targets[0])
-	*/
-}
 
 // InitDatastore is a common utility function used in tests. It sets up the
 // datastore to connect to the emulator and also clears out all instances of
@@ -114,7 +100,7 @@ to set the environment variables. When done running tests you can unset the env 
 	_, err := httpClient.Get("http://" + emulatorHost + "/")
 	assert.NoError(t, err, fmt.Sprintf("Cloud emulator host %s appears to be down or not accessible.", emulatorHost))
 
-	m, err := NewMentions(context.Background(), "test-project", fmt.Sprintf("test-namespace-%d", r.Uint64()))
+	m, err := NewMentions(context.Background(), "test-project", fmt.Sprintf("test-namespace-%d", r.Uint64()), logger.New())
 	assert.NoError(t, err)
 	return m
 }

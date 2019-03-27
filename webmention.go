@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"log"
 	"net/http"
 	"path"
 	"strconv"
@@ -13,6 +12,7 @@ import (
 
 	units "github.com/docker/go-units"
 
+	"github.com/jcgregorio/logger"
 	"github.com/jcgregorio/webmention-func/admin"
 	"github.com/jcgregorio/webmention-func/config"
 	"github.com/jcgregorio/webmention-func/mention"
@@ -20,6 +20,8 @@ import (
 
 var (
 	m *mention.Mentions
+
+	log = logger.New()
 
 	triageTemplate = template.Must(template.New("triage").Funcs(template.FuncMap{
 		"trunc": func(s string) string {
@@ -155,7 +157,7 @@ var (
 
 func init() {
 	var err error
-	m, err = mention.NewMentions(context.Background(), config.PROJECT, config.DATASTORE_NAMESPACE)
+	m, err = mention.NewMentions(context.Background(), config.PROJECT, config.DATASTORE_NAMESPACE, log)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -183,12 +185,12 @@ func Triage(w http.ResponseWriter, r *http.Request) {
 		}
 		limit, err := strconv.ParseInt(limitText, 10, 32)
 		if err != nil {
-			log.Printf("Failed to parse limit: %s", err)
+			log.Infof("Failed to parse limit: %s", err)
 			return
 		}
 		offset, err := strconv.ParseInt(offsetText, 10, 32)
 		if err != nil {
-			log.Printf("Failed to parse offset: %s", err)
+			log.Infof("Failed to parse offset: %s", err)
 			return
 		}
 		context = &triageContext{
@@ -198,7 +200,7 @@ func Triage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if err := triageTemplate.Execute(w, context); err != nil {
-		log.Printf("Failed to render triage template: %s", err)
+		log.Errorf("Failed to render triage template: %s", err)
 	}
 }
 
@@ -216,11 +218,11 @@ func UpdateMention(w http.ResponseWriter, r *http.Request) {
 	}
 	var u updateMention
 	if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
-		log.Printf("Failed to decode update: %s", err)
+		log.Infof("Failed to decode update: %s", err)
 		http.Error(w, "Bad JSON", 400)
 	}
 	if err := m.UpdateState(r.Context(), u.Key, u.Value); err != nil {
-		log.Printf("Failed to write update: %s", err)
+		log.Infof("Failed to write update: %s", err)
 		http.Error(w, "Failed to write", 400)
 	}
 }
@@ -242,7 +244,7 @@ func Mentions(w http.ResponseWriter, r *http.Request) {
 		Mentions: mentions,
 	}
 	if err := mentionsTemplate.Execute(w, context); err != nil {
-		log.Printf("Failed to expand template: %s", err)
+		log.Errorf("Failed to expand template: %s", err)
 	}
 }
 
@@ -254,12 +256,12 @@ func IncomingWebMention(w http.ResponseWriter, r *http.Request) {
 	}
 	mention := mention.New(r.FormValue("source"), r.FormValue("target"))
 	if err := mention.FastValidate(); err != nil {
-		log.Printf("Invalid request: %s", err)
+		log.Infof("Invalid request: %s", err)
 		http.Error(w, fmt.Sprintf("Invalid request."), 400)
 		return
 	}
 	if err := m.Put(r.Context(), mention); err != nil {
-		log.Printf("Failed to enqueue mention: %s", err)
+		log.Infof("Failed to enqueue mention: %s", err)
 		http.Error(w, fmt.Sprintf("Failed to enqueue mention."), 400)
 		return
 	}
@@ -271,11 +273,11 @@ func Thumbnail(w http.ResponseWriter, r *http.Request) {
 	b, err := m.GetThumbnail(r.Context(), path.Base(r.URL.Path))
 	if err != nil {
 		http.Error(w, "Image not found", 404)
-		log.Printf("Failed to get image: %s", err)
+		log.Warningf("Failed to get image: %s", err)
 		return
 	}
 	if _, err = w.Write(b); err != nil {
-		log.Printf("Failed to write image: %s", err)
+		log.Errorf("Failed to write image: %s", err)
 		return
 	}
 }
