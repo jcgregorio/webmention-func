@@ -1,4 +1,4 @@
-package refs
+package webmention
 
 import (
 	"context"
@@ -205,6 +205,8 @@ type updateMention struct {
 	Value string `json:"value"`
 }
 
+// UpdateMention updates the triage state of a webmention.
+// Called from the Triage page.
 func UpdateMention(w http.ResponseWriter, r *http.Request) {
 	isAdmin := admin.IsAdmin(r)
 	if !isAdmin {
@@ -231,4 +233,24 @@ func Mentions(w http.ResponseWriter, r *http.Request) {
 	if err := mentionsTemplate.Execute(w, m); err != nil {
 		log.Printf("Failed to expand template: %s", err)
 	}
+}
+
+// IncomingWebMention handles incoming Webmentions.
+func IncomingWebMention(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	mention := mention.New(r.FormValue("source"), r.FormValue("target"))
+	if err := mention.FastValidate(); err != nil {
+		log.Printf("Invalid request: %s", err)
+		http.Error(w, fmt.Sprintf("Invalid request."), 400)
+		return
+	}
+	if err := m.Put(r.Context(), mention); err != nil {
+		log.Printf("Failed to enqueue mention: %s", err)
+		http.Error(w, fmt.Sprintf("Failed to enqueue mention."), 400)
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
 }
