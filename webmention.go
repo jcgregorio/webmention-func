@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"path"
 	"strconv"
 	"time"
 
@@ -128,7 +129,7 @@ var (
 				{{ if .AuthorURL }}
 					{{ if .Thumbnail }}
 					<a href="{{ .AuthorURL}}" rel=nofollow class="wm-thumbnail">
-						<img src="/u/thumbnail/{{ .Thumbnail }}"/>
+						<img src="/Thumbnail/{{ .Thumbnail }}"/>
 					</a>
 					{{ end }}
 					<a href="{{ .AuthorURL}}" rel=nofollow>
@@ -253,6 +254,20 @@ func IncomingWebMention(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)
+}
+
+func Thumbnail(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "image/png")
+	b, err := m.GetThumbnail(r.Context(), path.Base(r.URL.Path))
+	if err != nil {
+		http.Error(w, "Image not found", 404)
+		log.Printf("Failed to get image: %s", err)
+		return
+	}
+	if _, err = w.Write(b); err != nil {
+		log.Printf("Failed to write image: %s", err)
+		return
+	}
 }
 
 type PubSubMessage struct {
