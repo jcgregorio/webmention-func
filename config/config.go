@@ -14,6 +14,7 @@ var (
 	DATASTORE_NAMESPACE = "blog"
 	HOST                = fmt.Sprintf("https://%s-%s.cloudfunctions.net", REGION, PROJECT)
 	ADMINS              = []string{"joe.gregorio@gmail.com"}
+	PORT                = "8000"
 )
 
 func mustFindEnv(key string) string {
@@ -31,4 +32,5 @@ func init() {
 	DATASTORE_NAMESPACE = mustFindEnv("DATASTORE_NAMESPACE")
 	HOST = fmt.Sprintf("https://%s-%s.cloudfunctions.net", REGION, PROJECT)
 	ADMINS = strings.Split(mustFindEnv("ADMINS"), ",")
+	PORT = mustFindEnv("PORT")
 }

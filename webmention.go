@@ -1,4 +1,4 @@
-package webmention
+package main
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"time"
 
 	units "github.com/docker/go-units"
+	"github.com/gorilla/mux"
 
 	"github.com/jcgregorio/logger"
 	"github.com/jcgregorio/webmention-func/admin"
@@ -155,11 +156,13 @@ var (
 `))
 )
 
-func init() {
+func Init() {
 	var err error
 	m, err = mention.NewMentions(context.Background(), config.PROJECT, config.DATASTORE_NAMESPACE, log)
 	if err != nil {
 		log.Fatal(err)
+	} else {
+		log.Info("Initialized.")
 	}
 }
 
@@ -282,17 +285,27 @@ func Thumbnail(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type PubSubMessage struct {
-	Data []byte `json:"data"`
-}
-
 // VerifyQueuedMentions verifies untriaged webmentions.
 //
 // Should be called on a timer.
-func VerifyQueuedMentions(ctx context.Context, ps PubSubMessage) error {
+func VerifyQueuedMentions(w http.ResponseWriter, r *http.Request) {
 	client := &http.Client{
 		Timeout: time.Second * 30,
 	}
 	m.VerifyQueuedMentions(client)
-	return nil
+}
+
+func main() {
+	Init()
+
+	r := mux.NewRouter()
+	r.HandleFunc("/Mentions", Mentions).Methods("GET")
+	r.HandleFunc("/IncomingWebMention", IncomingWebMention).Methods("POST")
+	r.HandleFunc("/UpdateMention", UpdateMention).Methods("POST")
+	r.HandleFunc("/Triage", Triage).Methods("GET")
+	r.HandleFunc("/Thumbnail", Thumbnail).Methods("GET")
+	r.HandleFunc("/VerifyQueuedMentions", VerifyQueuedMentions).Methods("POST")
+
+	http.Handle("/", r)
+	log.Fatal(http.ListenAndServe(":"+config.PORT, nil))
 }

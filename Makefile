@@ -1,4 +1,9 @@
 include ./config.mk
+run:
+	printenv
+	go run ./webmention.go
+
+
 default:
 	go build .
 	echo gcloud --project=$(PROJECT) --region=$(REGION) functions deploy Triage --runtime go111 --trigger-http
