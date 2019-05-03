@@ -1,4 +1,4 @@
-FROM basealpine:3.8
+FROM alpine:3.8
 
 RUN addgroup -g 2000 -S bitworking && \
     adduser -u 2000 -S bitworking -G bitworking && \
@@ -6,6 +6,6 @@ RUN addgroup -g 2000 -S bitworking && \
 
 USER bitworking:bitworking
 
-COPY $GOPATH/bin/webmention /webmention
+COPY . /
 
 ENTRYPOINT ["/webmention"]
