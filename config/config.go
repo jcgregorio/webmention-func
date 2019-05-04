@@ -30,7 +30,7 @@ func init() {
 	REGION = mustFindEnv("REGION")
 	PROJECT = mustFindEnv("PROJECT")
 	DATASTORE_NAMESPACE = mustFindEnv("DATASTORE_NAMESPACE")
-	HOST = fmt.Sprintf("https://%s-%s.cloudfunctions.net", REGION, PROJECT)
+	HOST = mustFindEnv("HOST")
 	ADMINS = strings.Split(mustFindEnv("ADMINS"), ",")
 	PORT = mustFindEnv("PORT")
 }
