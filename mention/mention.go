@@ -378,7 +378,11 @@ func MakeUrlToImageReader(c *http.Client) UrlToImageReader {
 
 func (m *Mentions) findAuthor(ctx context.Context, u2r UrlToImageReader, mention *Mention, data *microformats.Data, it *microformats.Microformat) {
 	mention.Author = it.Value
-	mention.AuthorURL = data.Rels["author"][0]
+	if len(data.Rels["author"]) > 0 {
+		mention.AuthorURL = data.Rels["author"][0]
+	} else {
+		mention.AuthorURL = firstPropAsString(it, "url")
+	}
 	u := firstPropAsString(it, "photo")
 	if u == "" {
 		m.log.Infof("No photo URL found.")
