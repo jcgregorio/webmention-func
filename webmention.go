@@ -238,6 +238,11 @@ type MentionsContext struct {
 // Mentions returns HTML describing all the good Webmentions for the given URL.
 func Mentions(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	if r.Method == "OPTIONS" {
+		return
+	}
 	mentions := m.GetGood(r.Context(), r.Referer())
 	if len(mentions) == 0 {
 		return
@@ -299,7 +304,7 @@ func main() {
 	Init()
 
 	r := mux.NewRouter()
-	r.HandleFunc("/Mentions", Mentions).Methods("GET")
+	r.HandleFunc("/Mentions", Mentions).Methods("GET", "OPTIONS")
 	r.HandleFunc("/IncomingWebMention", IncomingWebMention).Methods("POST")
 	r.HandleFunc("/UpdateMention", UpdateMention).Methods("POST")
 	r.HandleFunc("/Triage", Triage).Methods("GET")
