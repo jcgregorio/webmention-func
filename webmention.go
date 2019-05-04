@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
-	"path"
 	"strconv"
 	"time"
 
@@ -278,7 +277,8 @@ func IncomingWebMention(w http.ResponseWriter, r *http.Request) {
 
 func Thumbnail(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "image/png")
-	b, err := m.GetThumbnail(r.Context(), path.Base(r.URL.Path))
+	vars := mux.Vars(r)
+	b, err := m.GetThumbnail(r.Context(), vars["id"])
 	if err != nil {
 		http.Error(w, "Image not found", 404)
 		log.Warningf("Failed to get image: %s", err)
@@ -308,7 +308,7 @@ func main() {
 	r.HandleFunc("/IncomingWebMention", IncomingWebMention).Methods("POST")
 	r.HandleFunc("/UpdateMention", UpdateMention).Methods("POST")
 	r.HandleFunc("/Triage", Triage).Methods("GET")
-	r.HandleFunc("/Thumbnail", Thumbnail).Methods("GET")
+	r.HandleFunc("/Thumbnail/{id:[a-z0-9]+}", Thumbnail).Methods("GET")
 	r.HandleFunc("/VerifyQueuedMentions", VerifyQueuedMentions).Methods("POST")
 
 	http.Handle("/", r)
