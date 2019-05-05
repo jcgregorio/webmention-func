@@ -1,7 +1,6 @@
 SHELL=/bin/bash
 include ./config.mk
 run:
-	printenv
 	go run ./webmention.go
 
 release:
@@ -20,3 +19,6 @@ start_datastore_emulator:
 	 echo To attach run:
 	 echo "  export DATASTORE_EMULATOR_HOST=0.0.0.0:8000"
 	 docker run -ti -p 8000:8000 google/cloud-sdk:latest gcloud beta emulators datastore start --no-store-on-disk --project test-project --host-port 0.0.0.0:8000
+
+test:
+	go test ./...
