@@ -21,13 +21,13 @@ Installation
 
 Then clone this repository and edit config.mk:
 
-> export PROJECT=my-google-project-name
-> export REGION=us-central1
-> export HOST=https://webmention-blahblah.a.run.app
-> export CLIENT_ID=95264313...ps.googleusercontent.com
-> export DATASTORE_NAMESPACE=blog
-> export ADMINS=someone@example.com
-> export PORT=1313
+    export PROJECT=my-google-project-name
+    export REGION=us-central1
+    export HOST=https://webmention-blahblah.a.run.app
+    export CLIENT_ID=95264313...ps.googleusercontent.com
+    export DATASTORE_NAMESPACE=blog
+    export ADMINS=someone@example.com
+    export PORT=1313
 
 **PROJECT** - The name of your Google Cloud Project.
 
