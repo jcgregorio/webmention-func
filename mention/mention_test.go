@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -45,24 +44,8 @@ to set the environment variables. When done running tests you can unset the env 
 `)
 	}
 
-	// Copied from net/http to create a fresh http client. In some tests the
-	// httpmock replaces the default http client and the healthcheck below fails.
-	var transport http.RoundTripper = &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-			DualStack: true,
-		}).DialContext,
-		MaxIdleConns:          100,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-	}
-	httpClient := &http.Client{Transport: transport}
-
 	// Do a quick healthcheck against the host, which will fail immediately if it's down.
-	_, err := httpClient.Get("http://" + emulatorHost + "/")
+	_, err := http.DefaultClient.Get("http://" + emulatorHost + "/")
 	assert.NoError(t, err, fmt.Sprintf("Cloud emulator host %s appears to be down or not accessible.", emulatorHost))
 
 	m, err := NewMentions(context.Background(), "test-project", fmt.Sprintf("test-namespace-%d", r.Uint64()), logger.New())
